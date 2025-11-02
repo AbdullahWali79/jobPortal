@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { SoftwareHouse, JobPost } from '@/types/database'
 import { format } from 'date-fns'
@@ -14,16 +15,55 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [defaultDays, setDefaultDays] = useState(5)
   const [activeTab, setActiveTab] = useState<'active' | 'expired'>('active')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
-    // Check Supabase configuration first
-    if (!isSupabaseConfigured()) {
-      setError('Supabase is not configured. Please check your environment variables in Vercel Dashboard. Go to Settings → Environment Variables and ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
-      setLoading(false)
-      return
-    }
-    loadData()
+    // Check authentication first
+    checkAuth()
   }, [])
+
+  const checkAuth = () => {
+    if (typeof window !== 'undefined') {
+      const loggedIn = localStorage.getItem('admin_logged_in')
+      const loginTime = localStorage.getItem('admin_login_time')
+      
+      // Check if logged in and session is valid (24 hours)
+      if (loggedIn === 'true' && loginTime) {
+        const loginDate = new Date(loginTime)
+        const now = new Date()
+        const hoursDiff = (now.getTime() - loginDate.getTime()) / (1000 * 60 * 60)
+        
+        if (hoursDiff < 24) {
+          // Valid session - load dashboard
+          setIsAuthenticated(true)
+          // Check Supabase configuration and load data
+          if (!isSupabaseConfigured()) {
+            setError('Supabase is not configured. Please check your environment variables in Vercel Dashboard. Go to Settings → Environment Variables and ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
+            setLoading(false)
+            return
+          }
+          loadData()
+        } else {
+          // Session expired - clear and redirect
+          localStorage.removeItem('admin_logged_in')
+          localStorage.removeItem('admin_login_time')
+          router.replace('/admin/login')
+        }
+      } else {
+        // Not logged in - immediately redirect to login
+        router.replace('/admin/login')
+      }
+    }
+  }
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('admin_logged_in')
+      localStorage.removeItem('admin_login_time')
+    }
+    router.push('/admin/login')
+  }
 
   const loadData = async () => {
     try {
@@ -213,7 +253,8 @@ export default function AdminPage() {
     alert('Default days saved!')
   }
 
-  if (loading) {
+  // Show loading or redirect if not authenticated
+  if (!isAuthenticated || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -273,7 +314,15 @@ export default function AdminPage() {
               </div>
               <span className="text-2xl font-bold text-primary-blue">InternHub Admin</span>
             </Link>
-            <Link href="/" className="text-primary-blue hover:underline">Back to Home</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-primary-blue hover:underline">Back to Home</Link>
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
