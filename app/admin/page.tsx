@@ -28,12 +28,15 @@ export default function AdminPage() {
   const loadData = async () => {
     try {
       setError(null)
+      setLoading(true)
       
       if (!isSupabaseConfigured() || !supabase) {
         setError('Supabase is not configured. Please check your environment variables in Vercel Dashboard. Go to Settings → Environment Variables and ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
         setLoading(false)
         return
       }
+      
+      console.log('Loading admin data...')
       
       // Load pending houses
       const { data: housesData, error: housesError } = await supabase
@@ -44,45 +47,70 @@ export default function AdminPage() {
 
       if (housesError) {
         console.error('Error loading pending houses:', housesError)
-        setError(housesError.message || 'Failed to load pending software houses. Check if database tables exist.')
-      } else if (housesData) {
+        setError(housesError.message || 'Failed to load pending software houses. Check if database tables exist and RLS policies are set correctly.')
+        setLoading(false)
+        return
+      }
+      
+      if (housesData !== null) {
+        console.log('Loaded pending houses:', housesData.length)
         setPendingHouses(housesData as SoftwareHouse[])
       }
 
-      // Load active jobs
-      const { data: activeJobsData, error: activeJobsError } = await supabase
+      // Load ALL jobs first (without join to avoid RLS issues)
+      const { data: allJobsData, error: allJobsError } = await supabase
         .from('job_posts')
-        .select(`
-          *,
-          software_house:software_houses(*)
-        `)
-        .neq('status', 'hidden')
-        .gte('expires_at', new Date().toISOString())
+        .select('*')
         .order('created_at', { ascending: false })
 
-      if (activeJobsError) {
-        console.error('Error loading active jobs:', activeJobsError)
-        if (!error) setError('Failed to load active jobs')
-      } else if (activeJobsData) {
-        setActiveJobs(activeJobsData as JobPost[])
+      if (allJobsError) {
+        console.error('Error loading jobs:', allJobsError)
+        setError(allJobsError.message || 'Failed to load job posts. Check RLS policies.')
+        setLoading(false)
+        return
       }
 
-      // Load expired jobs
-      const { data: expiredJobsData, error: expiredJobsError } = await supabase
-        .from('job_posts')
-        .select(`
-          *,
-          software_house:software_houses(*)
-        `)
-        .neq('status', 'hidden')
-        .lt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
+      if (allJobsData !== null) {
+        console.log('Loaded all jobs:', allJobsData.length)
+        
+        // Now load software houses for the jobs (separate query to avoid RLS join issues)
+        const jobIds = allJobsData.map(job => job.software_house_id)
+        const uniqueHouseIds = [...new Set(jobIds)]
+        
+        const { data: housesForJobs, error: housesForJobsError } = await supabase
+          .from('software_houses')
+          .select('*')
+          .in('id', uniqueHouseIds)
+        
+        if (housesForJobsError) {
+          console.warn('Error loading houses for jobs:', housesForJobsError)
+        }
 
-      if (expiredJobsError) {
-        console.error('Error loading expired jobs:', expiredJobsError)
-        if (!error) setError('Failed to load expired jobs')
-      } else if (expiredJobsData) {
-        setExpiredJobs(expiredJobsData as JobPost[])
+        const housesMap = new Map()
+        if (housesForJobs) {
+          housesForJobs.forEach((house: SoftwareHouse) => {
+            housesMap.set(house.id, house)
+          })
+        }
+
+        // Separate active and expired jobs
+        const now = new Date().toISOString()
+        const activeJobs = allJobsData.filter(job => 
+          job.status !== 'hidden' && new Date(job.expires_at) >= new Date(now)
+        ).map(job => ({
+          ...job,
+          software_house: housesMap.get(job.software_house_id) || null
+        }))
+
+        const expiredJobs = allJobsData.filter(job => 
+          job.status !== 'hidden' && new Date(job.expires_at) < new Date(now)
+        ).map(job => ({
+          ...job,
+          software_house: housesMap.get(job.software_house_id) || null
+        }))
+
+        setActiveJobs(activeJobs as JobPost[])
+        setExpiredJobs(expiredJobs as JobPost[])
       }
 
       // Load default days setting (stored in localStorage for demo)

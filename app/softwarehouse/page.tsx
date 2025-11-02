@@ -112,16 +112,34 @@ export default function SoftwareHousePage() {
         .select()
         .single()
 
-      if (error) throw error
-
-      setHouse(data as SoftwareHouse)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('software_house_id', data.id)
+      if (error) {
+        console.error('Registration error:', error)
+        throw error
       }
-      alert('Registration submitted! Waiting for admin approval.')
+
+      if (!data) {
+        throw new Error('No data returned from registration')
+      }
+
+      console.log('Registration successful:', data)
+      
+      // Set the house data immediately
+      const houseData = data as SoftwareHouse
+      setHouse(houseData)
+      
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('software_house_id', houseData.id)
+      }
+      
+      // Clear form
       setFormData({ name: '', phone: '', display_phone: '', website: '' })
+      
+      // Show success message
+      alert('Registration submitted! Waiting for admin approval. You can now see your dashboard.')
     } catch (error: any) {
-      alert('Error: ' + error.message)
+      console.error('Registration failed:', error)
+      alert('Error: ' + (error.message || 'Failed to submit registration. Please check browser console for details.'))
     } finally {
       setRegistering(false)
     }

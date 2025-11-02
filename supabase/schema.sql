@@ -39,6 +39,11 @@ ALTER TABLE job_posts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read for approved houses" ON software_houses
   FOR SELECT USING (status = 'approved');
 
+-- Allow reading pending/rejected houses (needed for dashboard after registration)
+-- In production, use proper auth to restrict this to the owner only
+CREATE POLICY "Allow public read for pending houses" ON software_houses
+  FOR SELECT USING (status IN ('pending', 'rejected'));
+
 CREATE POLICY "Allow public insert for registration" ON software_houses
   FOR INSERT WITH CHECK (true);
 
