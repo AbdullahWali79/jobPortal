@@ -1,0 +1,51 @@
+# Vercel Environment Variables
+# Copy these values and add them in Vercel Dashboard:
+# https://vercel.com/muhammad-abdullahs-projects-34b7cffc/job-portal/settings/environment-variables
+#
+# Or use: vercel env add VARIABLE_NAME (then paste the value when prompted)
+
+===========================================
+1. NEXT_PUBLIC_SUPABASE_URL
+===========================================
+Value:
+https://xwohxmigixrrlcpspsqs.supabase.co
+
+Environments: Production, Preview, Development (select all 3)
+
+===========================================
+2. NEXT_PUBLIC_SUPABASE_ANON_KEY
+===========================================
+Value:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3b2h4bWlnaXhycmxjcHNwc3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMDQ5MjksImV4cCI6MjA3NzU4MDkyOX0.TZTBhL7vTtZCkBHNNtaiFDF8BFHX6i6UTwh59E-qmmM
+
+Environments: Production, Preview, Development (select all 3)
+
+===========================================
+3. SUPABASE_SERVICE_ROLE_KEY
+===========================================
+Value:
+[IMPORTANT: Get this from Supabase Dashboard]
+Steps:
+1. Go to https://supabase.com/dashboard/project/xwohxmigixrrlcpspsqs
+2. Navigate to Settings → API
+3. Copy the "service_role" key (secret key)
+4. Paste it here as the value
+
+Environments: Production, Preview, Development (select all 3)
+
+===========================================
+4. NEXT_PUBLIC_DEFAULT_JOB_DISPLAY_DAYS
+===========================================
+Value:
+5
+
+Environments: Production, Preview, Development (select all 3)
+
+===========================================
+QUICK COPY-PASTE FOR VERCEL DASHBOARD:
+===========================================
+
+Go to: https://vercel.com/muhammad-abdullahs-projects-34b7cffc/job-portal/settings/environment-variables
+
+Then add each variable above one by one.
+
