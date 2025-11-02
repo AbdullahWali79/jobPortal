@@ -10,6 +10,7 @@ export default function SoftwareHousePage() {
   const [house, setHouse] = useState<SoftwareHouse | null>(null)
   const [jobs, setJobs] = useState<JobPost[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [registering, setRegistering] = useState(false)
   const [posting, setPosting] = useState(false)
   
@@ -35,19 +36,35 @@ export default function SoftwareHousePage() {
 
   const checkExistingHouse = async () => {
     try {
+      setError(null)
+      
+      if (!supabase) {
+        setError('Supabase client not initialized. Please check your .env.local file.')
+        setLoading(false)
+        return
+      }
+      
       // In a real app, you'd get this from auth session
       // For now, we'll check localStorage or allow manual entry
       if (typeof window !== 'undefined') {
         const storedHouseId = localStorage.getItem('software_house_id')
         
         if (storedHouseId) {
-          const { data: houseData } = await supabase
+          const { data: houseData, error: fetchError } = await supabase
             .from('software_houses')
             .select('*')
             .eq('id', storedHouseId)
             .single()
           
-          if (houseData) {
+          if (fetchError) {
+            console.error('Error fetching house:', fetchError)
+            if (fetchError.code === 'PGRST116') {
+              // Not found, clear localStorage
+              localStorage.removeItem('software_house_id')
+            } else {
+              setError('Failed to load software house data. Please check your connection and database setup.')
+            }
+          } else if (houseData) {
             setHouse(houseData as SoftwareHouse)
             loadJobs(storedHouseId)
           } else {
@@ -55,22 +72,29 @@ export default function SoftwareHousePage() {
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking house:', error)
+      setError(error.message || 'An error occurred. Please check your browser console and database setup.')
     } finally {
       setLoading(false)
     }
   }
 
   const loadJobs = async (houseId: string) => {
-    const { data, error } = await supabase
-      .from('job_posts')
-      .select('*')
-      .eq('software_house_id', houseId)
-      .order('created_at', { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from('job_posts')
+        .select('*')
+        .eq('software_house_id', houseId)
+        .order('created_at', { ascending: false })
 
-    if (!error && data) {
-      setJobs(data as JobPost[])
+      if (error) {
+        console.error('Error loading jobs:', error)
+      } else if (data) {
+        setJobs(data as JobPost[])
+      }
+    } catch (error: any) {
+      console.error('Error loading jobs:', error)
     }
   }
 
@@ -157,8 +181,34 @@ export default function SoftwareHousePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-gray-600 text-lg mb-2">Loading...</div>
+          <div className="text-gray-400 text-sm">Please wait while we load your dashboard</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto px-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <h2 className="text-red-800 font-bold text-lg mb-2">Error Loading Page</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                checkExistingHouse()
+              }}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       </div>
     )
   }

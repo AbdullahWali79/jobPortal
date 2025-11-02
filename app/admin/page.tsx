@@ -11,6 +11,7 @@ export default function AdminPage() {
   const [activeJobs, setActiveJobs] = useState<JobPost[]>([])
   const [expiredJobs, setExpiredJobs] = useState<JobPost[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [defaultDays, setDefaultDays] = useState(5)
   const [activeTab, setActiveTab] = useState<'active' | 'expired'>('active')
 
@@ -20,17 +21,30 @@ export default function AdminPage() {
 
   const loadData = async () => {
     try {
+      setError(null)
+      
+      if (!supabase) {
+        setError('Supabase client not initialized. Please check your .env.local file.')
+        setLoading(false)
+        return
+      }
+      
       // Load pending houses
-      const { data: housesData } = await supabase
+      const { data: housesData, error: housesError } = await supabase
         .from('software_houses')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
 
-      if (housesData) setPendingHouses(housesData as SoftwareHouse[])
+      if (housesError) {
+        console.error('Error loading pending houses:', housesError)
+        setError(housesError.message || 'Failed to load pending software houses. Check if database tables exist.')
+      } else if (housesData) {
+        setPendingHouses(housesData as SoftwareHouse[])
+      }
 
       // Load active jobs
-      const { data: activeJobsData } = await supabase
+      const { data: activeJobsData, error: activeJobsError } = await supabase
         .from('job_posts')
         .select(`
           *,
@@ -40,10 +54,15 @@ export default function AdminPage() {
         .gte('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
-      if (activeJobsData) setActiveJobs(activeJobsData as JobPost[])
+      if (activeJobsError) {
+        console.error('Error loading active jobs:', activeJobsError)
+        if (!error) setError('Failed to load active jobs')
+      } else if (activeJobsData) {
+        setActiveJobs(activeJobsData as JobPost[])
+      }
 
       // Load expired jobs
-      const { data: expiredJobsData } = await supabase
+      const { data: expiredJobsData, error: expiredJobsError } = await supabase
         .from('job_posts')
         .select(`
           *,
@@ -53,15 +72,21 @@ export default function AdminPage() {
         .lt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
-      if (expiredJobsData) setExpiredJobs(expiredJobsData as JobPost[])
+      if (expiredJobsError) {
+        console.error('Error loading expired jobs:', expiredJobsError)
+        if (!error) setError('Failed to load expired jobs')
+      } else if (expiredJobsData) {
+        setExpiredJobs(expiredJobsData as JobPost[])
+      }
 
       // Load default days setting (stored in localStorage for demo)
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('default_job_days')
         if (stored) setDefaultDays(parseInt(stored))
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading data:', error)
+      setError(error.message || 'An unexpected error occurred. Please check your browser console.')
     } finally {
       setLoading(false)
     }
@@ -156,8 +181,48 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-gray-600 text-lg mb-2">Loading Admin Panel...</div>
+          <div className="text-gray-400 text-sm">Please wait</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto px-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <h2 className="text-red-800 font-bold text-lg mb-2">Error Loading Admin Panel</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <div className="space-y-2 mb-4">
+              <p className="text-sm text-gray-600">Possible causes:</p>
+              <ul className="text-sm text-gray-600 list-disc list-inside">
+                <li>Supabase connection issue</li>
+                <li>Database tables not created</li>
+                <li>RLS policies blocking access</li>
+              </ul>
+            </div>
+            <button
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                loadData()
+              }}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors mr-2"
+            >
+              Try Again
+            </button>
+            <a
+              href="/"
+              className="inline-block bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Go Home
+            </a>
+          </div>
+        </div>
       </div>
     )
   }
