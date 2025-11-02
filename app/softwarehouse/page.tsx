@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { SoftwareHouse, JobPost } from '@/types/database'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -38,8 +38,8 @@ export default function SoftwareHousePage() {
     try {
       setError(null)
       
-      if (!supabase) {
-        setError('Supabase client not initialized. Please check your .env.local file.')
+      if (!isSupabaseConfigured() || !supabase) {
+        setError('Supabase is not configured. Please check your environment variables in Vercel Dashboard. Go to Settings → Environment Variables and ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
         setLoading(false)
         return
       }
